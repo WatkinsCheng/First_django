@@ -1,0 +1,237 @@
+Index: templates/Login.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- templates/Login.html	(revision )
++++ templates/Login.html	(revision )
+@@ -0,0 +1,15 @@
++<!DOCTYPE html>
++<html>
++<head>
++    <title>Login</title>
++</head>
++<body>
++<form method="post">
++    {% csrf_token %}
++    {{uf.as_p}}
++    <input type="submit" value="login">
++    <br>
++    <a href="http://127.0.0.1:8000/regist">regist</a>
++</form>
++</body>
++</html>
+\ No newline at end of file
+Index: templates/Regist.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- templates/Regist.html	(revision )
++++ templates/Regist.html	(revision )
+@@ -0,0 +1,26 @@
++<!DOCTYPE html>
++<html>
++<head>
++    <title>Regist</title>
++</head>
++<body>
++
++{% if Method == 'GET' %}
++    <form method ="post">
++        {% csrf_token %}
++        {{uf.as_p}}
++        <input type="submit" name="regist" value="regist">
++    </form>
++{% else %}
++    {% if username %}
++        {{username}} regist is success!
++        <br>
++        <a href="http://127.0.0.1:8000/login">login</a>
++    {% else %}
++        {{ registJudge }}  is exist!
++        <br>
++        <a href="http://127.0.0.1:8000/regist">regist</a>
++    {% endif %}
++{% endif %}
++</body>
++</html>
+\ No newline at end of file
+Index: templates/Logout.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- templates/Logout.html	(revision )
++++ templates/Logout.html	(revision )
+@@ -0,0 +1,10 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <title>Title</title>
++</head>
++<body>
++    <h1>logout</h1>
++</body>
++</html>
+\ No newline at end of file
+Index: migrations/views.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- migrations/views.py	(date 1524144681000)
++++ migrations/views.py	(revision )
+@@ -1,9 +1,63 @@
+-from django.shortcuts import HttpResponse
++from django import forms
++from django.http import HttpResponseRedirect
++from django.shortcuts import HttpResponse, render_to_response
+ from django.shortcuts import render
++from django.template import RequestContext
+ 
++from migrations.models import User
+ 
+-def index(request):
+-    # 封装字符串
+-    # return HttpResponse("Hello World!")
+ 
+-    return render(request, "index.html", )
+\ No newline at end of file
++class UserForm(forms.Form):
++        username = forms.CharField(label='username', max_length=100)
++        password = forms.CharField(label='password', widget=forms.PasswordInput())
++
++
++def regist(req):
++    Method = req.method
++    if Method == 'POST':
++        uf = UserForm(req.POST)
++        if uf.is_valid():
++            username = uf.cleaned_data['username']
++            password = uf.cleaned_data['password']
++
++            try:
++                registJudge = User.objects.filter(username=username).get().username
++                return render_to_response('regist.html', {'registJudge': registJudge})
++            except:
++                registAdd = User.objects.create(username=username, password=password)
++                return render_to_response('regist.html', {'registAdd': registAdd, 'username': username})
++
++    else:
++        uf = UserForm()
++    return render_to_response('regist.html', {'uf': uf, 'Method': Method}, context_instance=RequestContext(req))
++
++
++def login(req):
++    if req.method == 'POST':
++        uf = UserForm(req.POST)
++        if uf.is_valid():
++            username = uf.cleaned_data['username']
++            password = uf.cleaned_data['password']
++            #对比输入的用户名和密码和数据库中是否一致
++            userPassJudge = User.objects.filter(username__exact=username, password__exact=password)
++
++            if userPassJudge:
++                response = HttpResponseRedirect('/index/')
++                response.set_cookie('cookie_username', username, 3600)
++                return response
++            else:
++                return HttpResponse('login.html')
++    else:
++        uf = UserForm()
++    return render_to_response('login.html', {'uf': uf}, context_instance=RequestContext(req))
++
++
++def index(req):
++    username = req.COOKIES.get('cookie_username', '')
++    return render_to_response('index.html', {'username': username})
++
++
++def logout(req):
++    response = HttpResponse('logout!<br><a href="127.0.0.1:8000/regist>regist</a>"')
++    response.delete_cookie('cookie_username')
++    return response
+\ No newline at end of file
+Index: templates/index.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- templates/index.html	(date 1524144681000)
++++ templates/index.html	(revision )
+@@ -1,10 +1,16 @@
+ <!DOCTYPE html>
+-<html lang="en">
++<html>
+ <head>
+-    <meta charset="UTF-8">
+-    <title>First django project</title>
++    <title>Index</title>
+ </head>
+ <body>
+-    <h1>Hello World!</h1>
++<h1>Welcome {{ username }}!</h1>
++
++<br>
++<a href="http://127.0.0.1:8000/logout">退出</a>
++<br>
++<a href="http://127.0.0.1:8000/login">登录</a>
++<br>
++<a href="http://127.0.0.1:8000/regist">注册</a>
+ </body>
+ </html>
+\ No newline at end of file
+Index: Mysite/settings.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Mysite/settings.py	(date 1524144681000)
++++ Mysite/settings.py	(revision )
+@@ -37,6 +37,7 @@
+     'django.contrib.sessions',
+     'django.contrib.messages',
+     'django.contrib.staticfiles',
++    'migrations',
+ ]
+ 
+ MIDDLEWARE = [
+Index: Mysite/urls.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Mysite/urls.py	(date 1524144681000)
++++ Mysite/urls.py	(revision )
+@@ -17,6 +17,9 @@
+ from django.contrib import admin
+ from migrations import views
+ urlpatterns = [
+-    # url(r'^admin/', admin.site.urls),
+-    url(r'^index/', views.index)
++    url(r'^admin/', admin.site.urls),
++    url(r'^index/', views.index, name='index'),
++    url(r'^login/', views.login, name='login'),
++    url(r'^logout/', views.logout, name='logout'),
++    url(r'^regist/', views.regist, name='regist'),
+ ]
+Index: migrations/models.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- migrations/models.py	(date 1524144681000)
++++ migrations/models.py	(revision )
+@@ -1,0 +1,9 @@
++from django.db import models
++
++
++class User(models.Model):
++    username = models.CharField(max_length=30)
++    password = models.CharField(max_length=30)
++
++    def __unicode__(self):
++        return self.username
+\ No newline at end of file

@@ -1,9 +1,63 @@
-from django.shortcuts import HttpResponse
+from django import forms
+from django.http import HttpResponseRedirect
+from django.shortcuts import HttpResponse, render_to_response
 from django.shortcuts import render
+from django.template import RequestContext
+
+from migrations.models import User
 
 
-def index(request):
-    # 封装字符串
-    # return HttpResponse("Hello World!")
+class UserForm(forms.Form):
+        username = forms.CharField(label='username', max_length=100)
+        password = forms.CharField(label='password', widget=forms.PasswordInput())
 
-    return render(request, "index.html", )
+
+def regist(req):
+    Method = req.method
+    if Method == 'POST':
+        uf = UserForm(req.POST)
+        if uf.is_valid():
+            username = uf.cleaned_data['username']
+            password = uf.cleaned_data['password']
+
+            try:
+                registJudge = User.objects.filter(username=username).get().username
+                return render_to_response('regist.html', {'registJudge': registJudge})
+            except:
+                registAdd = User.objects.create(username=username, password=password)
+                return render_to_response('regist.html', {'registAdd': registAdd, 'username': username})
+
+    else:
+        uf = UserForm()
+    return render_to_response('regist.html', {'uf': uf, 'Method': Method}, context_instance=RequestContext(req))
+
+
+def login(req):
+    if req.method == 'POST':
+        uf = UserForm(req.POST)
+        if uf.is_valid():
+            username = uf.cleaned_data['username']
+            password = uf.cleaned_data['password']
+            #对比输入的用户名和密码和数据库中是否一致
+            userPassJudge = User.objects.filter(username__exact=username, password__exact=password)
+
+            if userPassJudge:
+                response = HttpResponseRedirect('/index/')
+                response.set_cookie('cookie_username', username, 3600)
+                return response
+            else:
+                return HttpResponse('login.html')
+    else:
+        uf = UserForm()
+    return render_to_response('login.html', {'uf': uf}, context_instance=RequestContext(req))
+
+
+def index(req):
+    username = req.COOKIES.get('cookie_username', '')
+    return render_to_response('index.html', {'username': username})
+
+
+def logout(req):
+    response = HttpResponse('logout!<br><a href="127.0.0.1:8000/regist>regist</a>"')
+    response.delete_cookie('cookie_username')
+    return response
